@@ -1,0 +1,8 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# Verification artifacts produced while testing against a live GUI
+.procmgr-verify-*.png
+tmp-shot-*.png

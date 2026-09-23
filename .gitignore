@@ -1,0 +1,28 @@
+# ─── Dependencies & build output ────────────────────────────────────────────
+node_modules/
+dist/
+*.tgz
+
+# ─── Logs & OS noise ────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
+# ─── Editors ────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+
+# ─── Local-only, never published ────────────────────────────────────────────
+# Third-party plugins kept in the working tree for local development only.
+# They are not this repository's code: dsh-mcp is ArvinQi's project and
+# dsh-pocket-pro is a GPL-2.0 fork of shaobeichen/dsh-pocket. Keeping them out
+# of the tree avoids presenting someone else's work as this repository's own,
+# and keeps a GPL-2.0 codebase out of an MIT-licensed repository.
+dsh-mcp/
+dsh-pocket-pro/
+
+# Local environment notes (absolute paths, proxy ports, machine specifics).
+环境备忘.md

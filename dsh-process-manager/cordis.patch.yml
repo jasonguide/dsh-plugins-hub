@@ -1,0 +1,12 @@
+# dsh-process-manager bundle patch: inserts the dual-face plugin row into the
+# web profile roster. Applied as a profile bundle layer (the `dsh.bundle.patch`
+# manifest field) over dsh-base.
+#
+# The row is a bare plugin by package name: the node half (exports ".") runs in
+# the host process (the /api/dsh-process-manager routes and the PowerShell
+# collection scripts), and the `dsh.client` declaration in package.json makes
+# the browser half (exports "./client", served at /plugins/dsh-process-manager/
+# client.js) load in the web GUI.
+- insert:
+    - id: process-manager
+      name: 'dsh-process-manager'

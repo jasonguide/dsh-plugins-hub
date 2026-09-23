@@ -1,0 +1,54 @@
+{
+  "name": "dsh-process-manager",
+  "version": "0.1.0",
+  "description": "Windows process and listening-port manager for the dsh web GUI: a sidebar panel that lists every local listening port (process name, PID, protocol, address, executable path) and ends the process behind one — gracefully first.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": "^20.0.0 || >=22.0.0"
+  },
+  "os": [
+    "win32"
+  ],
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/host.test.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "cordis",
+    "process-manager",
+    "netstat",
+    "port",
+    "windows",
+    "taskkill"
+  ],
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.1.2-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
+}

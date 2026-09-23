@@ -1,0 +1,71 @@
+{
+  "name": "dsh-skills-hub",
+  "version": "0.3.1",
+  "description": "跨平台 AI Skills 统一管理器：以 ~/.agents/skills 为中心技能库，通过系统符号链接把同一份技能一键安装/卸载到 Claude Code、Cursor、Codex、Gemini CLI、Trae、Windsurf 等多个 Agent 工具，仅展示本机已安装的平台，统一管理本地技能目录与只读平台展示。支持 Windows / macOS / Linux。DeepSeek Harness plugin.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "scripts",
+    "README.md",
+    "README.zh.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "author": "jasonguide <33421801+jasonguide@users.noreply.github.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasonguide/dsh-skills-hub.git"
+  },
+  "homepage": "https://github.com/jasonguide/dsh-skills-hub",
+  "bugs": {
+    "url": "https://github.com/jasonguide/dsh-skills-hub/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "skills",
+    "ai-skills",
+    "skills-manager",
+    "claude-code",
+    "cursor",
+    "codex"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.1 <5.0.0",
+    "@deepseek-ai/dsh-host-webserver": ">=0.1.0-rc.5",
+    "@deepseek-ai/dsh-client-runtime": ">=0.1.0-rc.0 <0.2.0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.0-rc.0 <0.2.0",
+    "react": "^18.2.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
