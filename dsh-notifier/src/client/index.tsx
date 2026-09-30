@@ -131,7 +131,8 @@ const STYLE_ID = "dsh-notifier-style";
 // 声音行/三态/试听样式加入时再次 bump。
 // 能力自检行（dn-ch-diag）加入时再次 bump。
 // dry-run 结果行与脏态测试按钮样式加入时再次 bump。
-const CSS_VERSION = "ui-v3-2";
+// 按钮配色改为固定色（原用文本色当底色，暗色主题下白底白字）时再次 bump。
+const CSS_VERSION = "ui-v3-3";
 // 浏览器通知图标（内联 SVG data URL，零外部资源；铃铛造型）。
 const NOTIFY_ICON =
   "data:image/svg+xml;utf8," +

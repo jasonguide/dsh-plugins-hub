@@ -438,21 +438,27 @@
   font-size: 11px;
   border-radius: 8px;
 }
+/* 主按钮：固定的深蓝底 + 白字。不跟随主题变量——白底、暗底、各种皮肤下都清晰可读。 */
 .dn-set-card .dn-set-btnPrimary {
-  background: var(--dsw-alias-label-primary, #1f2329);
-  border-color: var(--dsw-alias-label-primary, #1f2329);
-  color: var(--dsw-alias-bg-base, #fff);
+  background: #3b6fd4;
+  border-color: #3b6fd4;
+  color: #fff;
   font-weight: 600;
 }
+.dn-set-card .dn-set-btnPrimary:hover {
+  background: #2f5cb4;
+  border-color: #2f5cb4;
+}
 .dn-set-card .dn-set-btnDanger {
-  background: var(--dsw-alias-state-error-primary, #8a4f45);
-  border-color: var(--dsw-alias-state-error-primary, #8a4f45);
+  background: #c0392b;
+  border-color: #c0392b;
   color: #fff;
 }
+/* 危险态「幽灵按钮」：只描边不着色，红字红框在两种背景下都清晰。 */
 .dn-set-card .dn-set-btnGhostDanger {
-  color: var(--dsw-alias-state-error-primary, #8a4f45);
-  border-color: var(--dsw-alias-state-error-soft, rgba(138, 79, 69, 0.15));
-  background: var(--dsw-alias-state-error-soft, rgba(138, 79, 69, 0.08));
+  color: #c0392b;
+  border-color: #c0392b;
+  background: transparent;
 }
 .dn-set-card button:focus-visible,
 .dn-set-card input:focus-visible,
@@ -466,6 +472,10 @@
   .dn-set-card .dn-set-btn:hover,
   .dn-set-card .dn-set-save:hover {
     opacity: 0.9;
+  }
+  .dn-set-card .dn-set-btnPrimary:hover,
+  .dn-set-card .dn-set-save:hover {
+    opacity: 1;
   }
 }
 .dn-set-card .dn-set-btn:disabled,
@@ -511,8 +521,8 @@
   margin-left: 14px;
   margin-right: 14px;
   padding: 8px 10px;
-  border: 1px solid var(--dsw-alias-state-warning-soft, rgba(138, 115, 64, 0.25));
-  background: var(--dsw-alias-state-warning-soft, rgba(138, 115, 64, 0.08));
+  border: 1px solid #d9a94f;
+  background: rgba(217, 169, 79, 0.14);
   border-radius: 8px;
 }
 .dn-set-card .dn-conflictText {
@@ -935,9 +945,9 @@
   font-size: 10px;
   border-radius: 6px;
   padding: 1px 6px;
-  background: var(--dsw-alias-state-error-soft, rgba(138, 79, 69, 0.08));
-  border: 1px solid var(--dsw-alias-state-error-primary, #8a4f45);
-  color: var(--dsw-alias-state-error-primary, #8a4f45);
+  background: rgba(192, 57, 43, 0.12);
+  border: 1px solid #c0392b;
+  color: #c0392b;
   flex: none;
   max-width: 200px;
   overflow: hidden;
@@ -1024,7 +1034,7 @@
 .dn-set-card .dn-tpl-chip.is-raw {
   border-style: solid;
   color: var(--dsw-alias-state-warning-primary, #8a7340);
-  border-color: var(--dsw-alias-state-warning-soft, rgba(138, 115, 64, 0.2));
+  border-color: var(--dsw-alias-state-warning-primary, rgba(138, 115, 64, 0.2));
 }
 
 /* levels */
@@ -1245,10 +1255,11 @@
 .dn-set-card .dn-set-foot .dn-set-error {
   color: var(--dsw-alias-state-error-primary, #8a4f45);
 }
+/* 保存按钮：与主按钮同一套固定配色，白底暗底都看得清。 */
 .dn-set-card .dn-set-save {
   border: none;
-  background: var(--dsw-alias-label-primary, #1a1a1a);
-  color: var(--dsw-alias-bg-base, #fff);
+  background: #3b6fd4;
+  color: #fff;
   border-radius: 10px;
   padding: 6px 18px;
   min-height: 32px;
@@ -1256,11 +1267,13 @@
   font-size: 12px;
   font-weight: 650;
   transition:
+    background 160ms ease,
     opacity 160ms ease,
     transform 160ms ease;
 }
 .dn-set-card .dn-set-save:hover {
-  opacity: 0.9;
+  background: #2f5cb4;
+  opacity: 1;
 }
 
 .dn-set-card .dn-set-notes {
@@ -1377,8 +1390,8 @@
   margin: 8px 14px;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid var(--dsw-alias-state-warning-soft, rgba(138, 115, 64, 0.25));
-  background: var(--dsw-alias-state-warning-soft, rgba(138, 115, 64, 0.06));
+  border: 1px solid #d9a94f;
+  background: rgba(217, 169, 79, 0.12);
   font-size: 12px;
 }
 .dn-dryrunTag {
