@@ -8,11 +8,11 @@ Every plugin lives in its own top-level directory and is independently installab
 
 ## Plugins
 
-| Plugin | Description | License |
-| --- | --- | --- |
-| [`dsh-notifier`](./dsh-notifier) | Native desktop notifications for the DSH Web GUI: questions, approval requests, task completion and task errors reach you as real OS toasts, so you know when to switch back. Two delivery channels, per-channel popup/sound switches, quiet hours, Bark and webhook push, notification history. | not declared |
-| [`dsh-process-manager`](./dsh-process-manager) | Windows process & listening-port panel for the DSH Web GUI: one sidebar entry listing every local listening port (process, PID, protocol, address, path) with the ability to end the process behind one — gracefully first. | MIT |
-| [`dsh-skills-hub`](./dsh-skills-hub) | Cross-platform AI Skills manager: keeps `~/.agents/skills` as the central library and symlinks the same skill into Claude Code, Cursor, Codex, Gemini CLI, Trae, Windsurf and others — install, uninstall and inspect from one place. | MIT |
+| Plugin | Description | 
+| --- | --- | 
+| [`dsh-notifier`](./dsh-notifier) | Native desktop notifications for the DSH Web GUI: questions, approval requests, task completion and task errors reach you as real OS toasts, so you know when to switch back. Two delivery channels, per-channel popup/sound switches, quiet hours, Bark and webhook push, notification history. | 
+| [`dsh-process-manager`](./dsh-process-manager) | Windows process & listening-port panel for the DSH Web GUI: one sidebar entry listing every local listening port (process, PID, protocol, address, path) with the ability to end the process behind one — gracefully first. |
+| [`dsh-skills-hub`](./dsh-skills-hub) | Cross-platform AI Skills manager: keeps `~/.agents/skills` as the central library and symlinks the same skill into Claude Code, Cursor, Codex, Gemini CLI, Trae, Windsurf and others — install, uninstall and inspect from one place. | 
 
 Each directory is a complete, standalone plugin package with its own `package.json`, `README.md` and tests.
 
