@@ -1,0 +1,10 @@
+{
+  "package": "dsh-notifier",
+  "exports": [
+    { "name": "apply", "isType": false },
+    { "name": "inject", "isType": false },
+    { "name": "name", "isType": false },
+    { "name": "NotifierApplyConfig", "isType": true },
+    { "name": "NotifierService", "isType": true }
+  ]
+}

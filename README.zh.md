@@ -10,10 +10,11 @@
 
 | 插件 | 说明 | 许可 |
 | --- | --- | --- |
+| [`dsh-notifier`](./dsh-notifier) | DSH Web GUI 的原生桌面通知：提问、审批请求、任务完成、任务出错都以真实的系统通知送达，让你知道什么时候该切回来。双投递通道、逐通道弹窗/声音开关、免打扰时段、Bark 与 Webhook 推送、通知历史。 | 未声明 |
 | [`dsh-process-manager`](./dsh-process-manager) | DSH Web GUI 的 Windows 进程 / 监听端口面板：侧边栏一个入口，列出本机所有监听端口（程序名、PID、协议、地址、路径），并能直接结束占用某个端口的进程——先优雅关闭再强制。 | MIT |
 | [`dsh-skills-hub`](./dsh-skills-hub) | 跨平台 AI Skills 统一管理器：以 `~/.agents/skills` 为中心技能库，通过符号链接把同一份技能安装到 Claude Code、Cursor、Codex、Gemini CLI、Trae、Windsurf 等工具，在一处完成安装、卸载与查看。 | MIT |
 
-每个目录都是一个完整、独立的插件包，自带 `package.json`、`README.md`、`LICENSE` 与测试。
+每个目录都是一个完整、独立的插件包，自带 `package.json`、`README.md` 与测试。
 
 ## 安装某个插件
 
@@ -40,6 +41,12 @@ dsh plugin --profile web add link:E:/path/to/dsh-plugins-hub/dsh-process-manager
 
 ```
 dsh-plugins-hub/
+├── dsh-notifier/            # 独立插件包
+│   ├── lib/                 # host 半边、浏览器半边、toast 脚本
+│   ├── src/                 # 构建出 lib/ 的源码
+│   ├── test/                # unit / integration / client / bundle / e2e
+│   ├── cordis.patch.yml     # 把插件行插入 profile 的 bundle 补丁
+│   └── package.json         # 声明 dsh.bundle.patch 与 dsh.client
 ├── dsh-process-manager/     # 独立插件包
 │   ├── lib/                 # host 半边、浏览器半边、PowerShell 脚本
 │   ├── test/                # host 侧测试
@@ -53,9 +60,9 @@ dsh-plugins-hub/
 
 ## 本仓库的插件约定
 
-- **自包含。** 插件的源码、测试、文档、许可证全在自己的目录内，不跨插件 import。
+- **自包含。** 插件的源码、测试、文档全在自己的目录内，不跨插件 import。
 - **优先零构建。** 仓库里的 JavaScript 就是最终产物，`dsh plugin add` 不需要编译，也不需要批准 pnpm 的构建脚本。
-- **自带 README 与 LICENSE。** 每个目录自己说明自己、自己授权；本根 README 只做索引。
+- **自带 README。** 每个目录自己说明自己；本根 README 只做索引。
 - **测试在插件目录内运行**，一条 `node test/...` 即可，不依赖仓库级工具链，因此任何单个插件都能被单独拎出去。
 
 ## 不在本仓库中的内容
@@ -69,4 +76,4 @@ dsh-plugins-hub/
 
 ## 许可证
 
-每个插件按各自目录内的许可条款单独授权。本仓库当前的所有插件均为 MIT。
+每个插件按各自目录内的条款单独授权；未附带许可文本的插件，除著作权法本身赋予的权利外不授予任何额外许可。各插件的具体状态见上方「许可」列。

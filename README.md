@@ -10,10 +10,11 @@ Every plugin lives in its own top-level directory and is independently installab
 
 | Plugin | Description | License |
 | --- | --- | --- |
+| [`dsh-notifier`](./dsh-notifier) | Native desktop notifications for the DSH Web GUI: questions, approval requests, task completion and task errors reach you as real OS toasts, so you know when to switch back. Two delivery channels, per-channel popup/sound switches, quiet hours, Bark and webhook push, notification history. | not declared |
 | [`dsh-process-manager`](./dsh-process-manager) | Windows process & listening-port panel for the DSH Web GUI: one sidebar entry listing every local listening port (process, PID, protocol, address, path) with the ability to end the process behind one — gracefully first. | MIT |
 | [`dsh-skills-hub`](./dsh-skills-hub) | Cross-platform AI Skills manager: keeps `~/.agents/skills` as the central library and symlinks the same skill into Claude Code, Cursor, Codex, Gemini CLI, Trae, Windsurf and others — install, uninstall and inspect from one place. | MIT |
 
-Each directory is a complete, standalone plugin package with its own `package.json`, `README.md`, `LICENSE` and tests.
+Each directory is a complete, standalone plugin package with its own `package.json`, `README.md` and tests.
 
 ## Installing a plugin
 
@@ -40,6 +41,12 @@ Refer to each plugin's own README for requirements, configuration and usage.
 
 ```
 dsh-plugins-hub/
+├── dsh-notifier/            # standalone plugin package
+│   ├── lib/                 # host half, browser half, toast script
+│   ├── src/                 # source the lib/ bundle is built from
+│   ├── test/                # unit / integration / client / bundle / e2e
+│   ├── cordis.patch.yml     # bundle patch that inserts the plugin row
+│   └── package.json         # declares dsh.bundle.patch + dsh.client
 ├── dsh-process-manager/     # standalone plugin package
 │   ├── lib/                 # host half, browser half, PowerShell scripts
 │   ├── test/                # host-side tests
@@ -53,9 +60,9 @@ Each plugin follows the same shape: the package declares `dsh.bundle.patch` (how
 
 ## Conventions for a plugin in this repository
 
-- **Self-contained.** All of a plugin's source, tests, documentation and license live inside its own directory. No cross-plugin imports.
+- **Self-contained.** All of a plugin's source, tests and documentation live inside its own directory. No cross-plugin imports.
 - **Zero build step preferred.** Shipped JavaScript is the source, so `dsh plugin add` never needs a compile step or a pnpm build-script approval.
-- **Own README and LICENSE.** Each directory documents and licenses itself; this root README only indexes them.
+- **Own README.** Each directory documents itself; this root README only indexes them.
 - **Tests run from the plugin directory** with a plain `node test/...` — no monorepo-wide tooling, so any single plugin can be cloned out on its own.
 
 ## Not in this repository
@@ -69,4 +76,4 @@ They can sit in the working tree for local development, but they are not this re
 
 ## License
 
-Each plugin is licensed individually under the terms in its own directory. All plugins currently in this repository are MIT.
+Each plugin is licensed individually under the terms in its own directory; a plugin that ships no licence text grants no licence beyond what copyright law provides. See the License column above for each plugin's status.

@@ -1,0 +1,280 @@
+/**
+ * dsh-notifier channels 域 —— 宿主能力自检面的组装。
+ *
+ * 它只做投影：把已探到的进程事实翻成「哪半边能用、下一步该干什么」，不新增任何探测副作用
+ * （只允许向 `org.freedesktop.DBus` 问 owner 与可激活清单，见 `../system/deps.ts`）。
+ */
+import { FOLLOW_SYSTEM_TONE } from "../../../../shared/interface.ts";
+import { toastScriptPath } from "../../../shared/interface.ts";
+import { platformCapabilities, systemDeps } from "../system/deps.ts";
+import { isServerlessPlayer, probePlatform } from "../system/index.ts";
+import { toneFileCandidates } from "../system/tones.ts";
+import type { NotificationNameProbe, OsReleaseProbe, PlatformProbe } from "../system/type.ts";
+import { ALLOWED_CHECKED, PACKAGE_FAMILIES, PLAYER_PACKAGES, POSIX_CHECKS } from "./table.ts";
+import type { DimensionChecks } from "./table.ts";
+import type {
+  CapabilityDimension,
+  CheckedDimension,
+  HostCapabilities,
+  PopupCapability,
+  Remediation,
+  RemediationCode,
+  SoundCapability,
+  Verdict,
+} from "./type.ts";
+
+/** 参与探测的音色：`sound: true` 走的就是它，故能力面报的就是用户默认配置下的可得性。 */
+const TONE_FOR_PROBE = FOLLOW_SYSTEM_TONE;
+
+/** 严重度序：`unreachable > unknown > degraded > ok`。`unknown` 不得降级为 `ok`，也不得升格为 `unreachable`。 */
+const SEVERITY: Readonly<Record<Verdict, number>> = {
+  ok: 0,
+  degraded: 1,
+  unknown: 2,
+  unreachable: 3,
+};
+
+/** 本平台的合法 `checked` 子集。认不出的平台退到 POSIX 一档，不借别的平台的词。 */
+export function checksFor(platform: string): DimensionChecks {
+  return ALLOWED_CHECKED[platform] ?? POSIX_CHECKS;
+}
+
+/**
+ * 实际产出是否落在「平台 × 维度」允许集内。
+ *
+ * 只有测试消费它（断言「探测产出 ⊆ 该平台允许集」），实现自己不调用；也**没有门禁**消费它——
+ * 那条不变量要在每个平台上真跑一次探测，CI 做不到。注释原先写成「门禁与测试用它判红」，与事实不符。
+ */
+export function checkedWithin(
+  platform: string,
+  dimension: CapabilityDimension,
+  dims: readonly CheckedDimension[],
+): boolean {
+  const allowed = checksFor(platform)[dimension];
+  return dims.every((dim) => allowed.includes(dim));
+}
+
+/** 宿主能力面（一次探测，由调用方负责缓存）。 */
+export async function probeHostCapabilities(): Promise<HostCapabilities> {
+  const deps = systemDeps();
+  const probe = await platformCapabilities.get(toastScriptPath(), probePlatform);
+  // darwin/win32 不走 notify-send，也就不问 D-Bus：那台机器上多半没有会话总线，问了只会白起一个
+  // 必然失败的子进程，还得等它超时。
+  const name: NotificationNameProbe = isSystemToolPlatform(probe.platform)
+    ? { kind: "absent" }
+    : await deps.probeNotificationName();
+  const candidates = toneFileCandidates(probe.platform, TONE_FOR_PROBE);
+  const toneFileAvailable = candidates.some((path) => deps.existsSync(path));
+  const popup = popupCapability(probe, name);
+  const sound = soundCapability(probe, {
+    toneFileAvailable,
+    toneFileProbed: candidates.length > 0,
+  });
+  return {
+    verdict: groupVerdict([popup.state, sound.state]),
+    unknownDimensions: dimensionsIn(
+      [
+        ["popup", popup.state],
+        ["sound", sound.state],
+      ],
+      "unknown",
+    ),
+    popup,
+    sound,
+    remediation: remediationOf({
+      probe,
+      name,
+      popup,
+      sound,
+      osRelease: deps.readOsRelease(),
+    }),
+  };
+}
+
+/** 组级结论取各维度最严重者：让客户端为两套词表写映射，等于给「未知」留一次被渲染成「可用」的机会。 */
+function groupVerdict(states: readonly Verdict[]): Verdict {
+  return states.reduce<Verdict>(
+    (worst, state) => (SEVERITY[state] > SEVERITY[worst] ? state : worst),
+    "ok",
+  );
+}
+
+function dimensionsIn(
+  entries: readonly (readonly [CapabilityDimension, Verdict])[],
+  wanted: Verdict,
+): readonly CapabilityDimension[] {
+  return entries.filter(([, state]) => state === wanted).map(([dimension]) => dimension);
+}
+
+/**
+ * darwin 走系统自带 `osascript`、win32 走 PowerShell + **随包**的 toast 脚本：前者没有需要探测的
+ * 依赖，后者只有一个「脚本在不在位」的事实。`checked` 一律留空，因为闭集里还没有 win32 的维度名
+ * （见 `type.ts` 的说明）——空数组正是「这一格没有用闭集里的维度验过」的如实暴露。
+ */
+function popupCapability(probe: PlatformProbe, name: NotificationNameProbe): PopupCapability {
+  if (probe.platform === "darwin") return { state: "ok", checked: [] };
+  if (probe.platform === "win32") {
+    // 脚本缺失是**打包缺陷**而不是宿主能力问题（同 #782 的 reasonSystemToastScriptMissing 口径）：
+    // 报 ok 会让窗口期里的用户按「宿主没问题」去查，方向完全反了。
+    return { state: probe.toastScriptAvailable ? "ok" : "unreachable", checked: [] };
+  }
+  return { state: popupStateOf(probe, name), checked: popupChecked(probe.platform, name) };
+}
+
+function isSystemToolPlatform(platform: string): boolean {
+  return platform === "darwin" || platform === "win32";
+}
+
+function popupStateOf(probe: PlatformProbe, name: NotificationNameProbe): Verdict {
+  if (name.kind === "no-session-bus") return "unreachable";
+  if (name.kind === "probe-failed") return "unknown";
+  if (!probe.notifySendAvailable) return "unreachable";
+  if (name.kind === "owner") return "ok";
+  return name.kind === "activatable" ? "unknown" : "unreachable";
+}
+
+/** 只列真问过的维度：`activatable` 那一问只在无 owner 时才发生。 */
+function popupChecked(platform: string, name: NotificationNameProbe): readonly CheckedDimension[] {
+  if (name.kind === "no-session-bus") return allowed(platform, "popup", ["session-bus"]);
+  const queried: CheckedDimension[] = ["notify-send", "dbus-name-owner", "session-bus"];
+  if (name.kind === "activatable" || name.kind === "absent") queried.push("dbus-activatable");
+  return allowed(platform, "popup", queried);
+}
+
+/**
+ * 把「问过的维度」收进本格的允许集。
+ *
+ * 如实说明：生产路径上它**不过滤掉任何东西**——各分支派生出的集合本就是允许集的子集，所以把它整段
+ * 删掉也不会有一条用例变红（实测过）。保留它是兜底而不是判据：真正的保证在测试侧的**精确取值**断言
+ * （多一个词就红）与「产出 ⊆ 允许集」断言，本函数只保证实现自己不越界。
+ */
+function allowed(
+  platform: string,
+  dimension: CapabilityDimension,
+  dims: readonly CheckedDimension[],
+): readonly CheckedDimension[] {
+  const permitted = checksFor(platform)[dimension];
+  return dims.filter((dim) => permitted.includes(dim));
+}
+
+interface ToneFacts {
+  toneFileAvailable: boolean;
+  /** 是否真的问过文件系统：候选为空（未知平台没有基目录）时不算问过。 */
+  toneFileProbed: boolean;
+}
+
+/**
+ * 声音维度。linux 只看播放器；darwin/win32 走系统播放路径，故只看音色文件。
+ *
+ * linux 为什么是三态而不是「有播放器就 ok」：`paplay`/`pw-play` 是**服务型**播放器，在没有声音服务的
+ * 宿主上必失败，而「有没有声音服务」探测不到——本机 `/run/user/1000/pulse` 存在但为空、无 pulse/pipewire
+ * 进程，D-Bus 会话总线却在，任何存在性探针都会把这种宿主误判成「有声音服务」。把测不准的事实在能力面上
+ * 写成 `ok`，用户就失去了唯一的排查线索；故只命中服务型候选时报 `degraded`——「命中的这些播放器都依赖
+ * 声音服务」是可判的事实，按它下结论不算猜。
+ *
+ * 音色文件在 linux 上不再参与结论：主题缺失时由运行时合成的 WAV 兜底，故它只作报告项留在 `checked` 里。
+ */
+function soundCapability(probe: PlatformProbe, tone: ToneFacts): SoundCapability {
+  const checked = allowed(probe.platform, "sound", [
+    ...(probe.platform === "linux" ? (["players"] as const) : []),
+    ...(tone.toneFileProbed ? (["tone-file"] as const) : []),
+  ]);
+  const base = { players: probe.players, toneFileAvailable: tone.toneFileAvailable, checked };
+  if (probe.platform === "linux") {
+    if (probe.players.length === 0) return { state: "unreachable", ...base };
+    const serverless = probe.players.some(isServerlessPlayer);
+    return { state: serverless ? "ok" : "degraded", ...base };
+  }
+  if (isSystemToolPlatform(probe.platform)) {
+    return { state: tone.toneFileAvailable ? "ok" : "degraded", ...base };
+  }
+  // 认不出的平台（freebsd 等）上 `probePlatform` 压根不探播放器，`players` 空是「没查」而不是「没有」：
+  // 报 unreachable 是拿一次没做过的探测当结论，报 unknown 才是实情。
+  return { state: "unknown", ...base };
+}
+
+/**
+ * 探测没能给出结论时的诚实回答：两个维度都「无法判定」，也不给任何处置建议。
+ * 单独成函数而不是就地写字面量，是为了让「无法判定」在所有调用方眼里都是同一份形状。
+ */
+export function undeterminedCapabilities(): HostCapabilities {
+  return {
+    verdict: "unknown",
+    unknownDimensions: ["popup", "sound"],
+    popup: { state: "unknown", checked: [] },
+    sound: { state: "unknown", players: [], toneFileAvailable: false, checked: [] },
+    remediation: [],
+  };
+}
+
+interface RemediationInput {
+  probe: PlatformProbe;
+  name: NotificationNameProbe;
+  popup: PopupCapability;
+  sound: SoundCapability;
+  osRelease: OsReleaseProbe;
+}
+
+/**
+ * 诊断出路。**不生产 `host-no-player`**：它要求「有声音服务但缺播放器」这个前提，而「有没有声音服务」
+ * 要等批 3 的「运行期失败自证」才拿得到；在此之前生产它只能靠猜。闭集保留该 code，客户端映射齐备即可。
+ *
+ * `host-no-tone-file` 只剩 darwin / win32：linux 的 `degraded` 现在只有一个成因（只命中服务型播放器），
+ * 与音色文件无关（主题缺失由合成兜底）。
+ */
+function remediationOf(input: RemediationInput): readonly Remediation[] {
+  const out: Remediation[] = [...popupRemedies(input)];
+  if (input.sound.state === "unreachable" && input.probe.platform === "linux") {
+    out.push(packageRemedy(input.osRelease, "host-no-sound-server-and-player"));
+  }
+  if (input.sound.state === "degraded") {
+    out.push(
+      input.probe.platform === "linux"
+        ? packageRemedy(input.osRelease, "host-only-sound-server-players")
+        : { code: "host-no-tone-file" },
+    );
+  }
+  // 弹窗与发声都不可达时，「装什么包」之外的出路是换通道——这一格才是「不归你管」的真实场景
+  if (input.popup.state === "unreachable" && input.sound.state === "unreachable") {
+    out.push({ code: "host-managed-by-others" });
+  }
+  return out;
+}
+
+/**
+ * 弹窗不可达时的出路：三条互斥（无会话总线 / 有 notify-send 但无守护进程 / linux 压根没有
+ * notify-send），故至多给一条，不是一条都不给就是三条都给。
+ *
+ * 与「声音维度的出路」分成两个函数：前者按 D-Bus 探测的三种 kind 分派，后者按
+ * players / 音色文件分派——判据来源不同，改一条不影响另一条。
+ */
+function popupRemedies(input: RemediationInput): readonly Remediation[] {
+  if (input.popup.state !== "unreachable") return [];
+  if (input.name.kind === "no-session-bus") return [{ code: "host-no-dbus-session" }];
+  if (input.name.kind === "absent" && input.probe.notifySendAvailable) {
+    return [{ code: "host-popup-no-daemon" }];
+  }
+  // 平台护栏不可省：darwin/win32 压根不探 notify-send（`notifySendAvailable` 恒 false），
+  // 少了它，win32 上 toast 脚本缺失导致的不可达会被说成「宿主缺 notify-send」——方向正好反了。
+  if (
+    input.probe.platform === "linux" &&
+    input.name.kind === "absent" &&
+    !input.probe.notifySendAvailable
+  ) {
+    return [{ code: "host-no-notify-send" }];
+  }
+  return [];
+}
+
+/**
+ * 装包建议：两格共用一份清单——「一个播放器都没命中」与「只命中服务型播放器」缺的是同一样东西，
+ * 即一个不依赖声音服务的播放器。认不出包管理器族就不给包名：宁可少说一句，不给错的包名。
+ */
+function packageRemedy(osRelease: OsReleaseProbe, code: RemediationCode): Remediation {
+  const family = osRelease.ok ? PACKAGE_FAMILIES[osRelease.id.toLowerCase()] : undefined;
+  if (family === undefined) return { code };
+  return {
+    code,
+    params: { packagemanager: family, packages: PLAYER_PACKAGES[family] },
+  };
+}
