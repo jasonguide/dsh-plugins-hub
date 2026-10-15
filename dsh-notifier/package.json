@@ -1,6 +1,6 @@
 {
   "name": "dsh-notifier",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "任务事件通知：浏览器 Notification + 系统原生桌面通知（Windows PowerShell WinRT toast / macOS osascript / Linux notify-send，均无需额外安装）；提示音可配、每条通知独立显示不互相替换、非安全上下文自动降级横幅。适配 DSH 0.2.x。",
   "type": "module",
   "main": "lib/index.js",
@@ -53,6 +53,18 @@
     "README.zh.md"
   ],
   "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.5-alpha.2",
+    "@deepseek-ai/dsh-agent": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-client-locale": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-client-ui-settings": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-host-webserver": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-session": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-session-title": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-settings": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-user-approval": "0.2.1-alpha.3",
+    "@deepseek-ai/dsh-user-questions": "0.2.1-alpha.3",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^22.10.0",
     "@types/react": "^18.3.0",
@@ -66,18 +78,18 @@
     "yaml": "^2.9.0"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "4.0.4",
-    "@deepseek-ai/dsh-agent": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-ui-settings": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-host-webserver": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-session-title": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-settings": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-user-approval": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-user-questions": "0.2.0-rc.2"
+    "@deepseek-ai/cordis": ">=4.0.0",
+    "@deepseek-ai/dsh-agent": ">=0.2.0",
+    "@deepseek-ai/dsh-client-locale": ">=0.2.0",
+    "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.0",
+    "@deepseek-ai/dsh-client-ui-settings": ">=0.2.0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0",
+    "@deepseek-ai/dsh-host-webserver": ">=0.2.0",
+    "@deepseek-ai/dsh-session": ">=0.2.0",
+    "@deepseek-ai/dsh-session-title": ">=0.2.0",
+    "@deepseek-ai/dsh-settings": ">=0.2.0",
+    "@deepseek-ai/dsh-user-approval": ">=0.2.0",
+    "@deepseek-ai/dsh-user-questions": ">=0.2.0"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/cordis": {
