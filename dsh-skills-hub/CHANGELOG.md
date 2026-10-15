@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.2] - 2026-10-15
+
+- **修复 DSH 0.2.x 兼容性**（设置页不显示、插件被整体跳过）：
+  - `dsh.client.inject` 移除已被 DSH 0.2.x 删除的 `@deepseek-ai/dsh-client-runtime`（该包在 npm 上止于 `0.1.1-rc.2`）。
+  - `peerDependencies` 同理移除 `dsh-client-runtime`；`dsh-host-webserver` 与 `dsh-client-ui-slots` 改为无上界的 `>=0.1.0-rc.5`，同时兼容 0.1.x 与 0.2.x。
+- 根因：`evaluatePluginCompatibility` 逐个校验 `@deepseek-ai/dsh-*` peer 范围，任一项不满足即抛错，导致整个 bundle 层被跳过（Host 半与 Client 半都不加载）。
+- `lib/index.js` 与 `lib/client.js` 源码无需改动（`webServer.register`、`slots.register`、`require("react")` 契约在新版均未变）。
+
 ## [0.3.1] - 2026-08-28
 
 - 开源仓库完备化：LICENSE copyright 归 jason；`package.json` 补 `author` / `repository` / `homepage` / `bugs`。
