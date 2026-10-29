@@ -41,6 +41,9 @@ window.__ModuleLoader__.load({
       ".skhub-path{margin-left:auto;max-width:46%;overflow:hidden;color:var(--dsw-alias-label-tertiary);font-size:12px;text-overflow:ellipsis;white-space:nowrap}",
       ".skhub-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px}",
       ".skhub-chip{padding:1px 8px;border:1px solid var(--dsw-alias-border-l3);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}",
+      ".skhub-chip-btn{background:transparent;font:inherit;cursor:pointer;transition:border-color 180ms ease,color 180ms ease}",
+      ".skhub-chip-btn:hover:not(:disabled){border-color:var(--dsw-alias-label-primary);color:var(--dsw-alias-label-primary)}",
+      ".skhub-chip-btn:disabled{cursor:default;opacity:.6}",
       ".skhub-row{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--dsw-alias-border-l1)}",
       ".skhub-row:last-child{border-bottom:0}",
       ".skhub-row-main{display:flex;min-width:0;flex:1;flex-direction:column;gap:2px}",
@@ -120,6 +123,15 @@ window.__ModuleLoader__.load({
         });
       }
 
+      // 打开目录：不改变列表、不占用 busy 锁（纯打开文件管理器）。
+      function openDir(platformId, skill) {
+        var body = { platform: platformId };
+        if (skill) body.skill = skill;
+        callApi("/open", { method: "POST", headers: MUTATION_HEADERS, body: JSON.stringify(body) }).catch(function (error) {
+          setMsg("打开失败：" + String(error && error.message ? error.message : error));
+        });
+      }
+
       var nodes = [h("style", { key: "css" }, CSS)];
 
       // 顶部工具栏
@@ -171,10 +183,21 @@ window.__ModuleLoader__.load({
               children.push(h("div", { key: "ro-note", className: "skhub-empty" }, "只读平台：仅展示，不提供安装/卸载"));
             }
 
-            // 中心技能库：只展示 chips，不提供安装/卸载
+            // 中心技能库：只展示 chips（点击名称用系统文件管理器打开该技能目录），不提供安装/卸载
             if (isCentral) {
               children.push(h("div", { key: "chips", className: "skhub-chips" },
-                skills.length ? skills.map(function (x) { return h("span", { key: x.name, className: "skhub-chip" }, x.name); }) : h("span", { className: "skhub-empty" }, "暂无技能")));
+                skills.length
+                  ? skills.map(function (x) {
+                      return h("button", {
+                        key: x.name,
+                        type: "button",
+                        className: "skhub-chip skhub-chip-btn",
+                        title: "在文件管理器中打开：" + x.name,
+                        disabled: busy,
+                        onClick: function () { openDir(p.id, x.name); },
+                      }, x.name);
+                    })
+                  : h("span", { className: "skhub-empty" }, "暂无技能")));
             }
 
             // 安装行（非中心、非只读）
@@ -191,15 +214,26 @@ window.__ModuleLoader__.load({
             } else if (!isCentral) {
               skills.forEach(function (x) {
                 var isLink = !!x.linkType;
-                var row = h("div", { key: x.name, className: "skhub-row" },
+                var openBtn = h("button", {
+                  key: "open",
+                  type: "button",
+                  className: "skhub-btn skhub-btn-secondary",
+                  disabled: busy,
+                  title: isLink ? "在文件管理器中打开真实目录：" + (x.target || x.name) : "在文件管理器中打开该技能目录",
+                  onClick: function () { openDir(p.id, x.name); },
+                }, "打开");
+                var unBtn = p.readonly
+                  ? null
+                  : isLink
+                    ? h("button", { key: "un", type: "button", className: "skhub-btn skhub-btn-secondary", disabled: busy, title: "仅删除链接，不影响中心技能库", onClick: function () { action("/uninstall", { platform: p.id, skill: x.name }, "已卸载链接：" + x.name + " ← " + p.name); } }, "卸载")
+                    : h("button", { key: "un", type: "button", className: "skhub-btn skhub-btn-danger", disabled: busy, title: "删除该平台下的本地技能数据源", onClick: function () { action("/uninstall", { platform: p.id, skill: x.name }, "已删除本地技能：" + x.name + " ← " + p.name); } }, "删除");
+                children.push(h("div", { key: x.name, className: "skhub-row" },
                   h("div", { className: "skhub-row-main" },
                     h("span", { className: "skhub-row-name" }, x.name),
                     x.target ? h("span", { className: "skhub-row-target", title: x.target }, "→ " + x.target) : null),
                   isLink ? h("span", { className: "skhub-tag skhub-tag-link" }, "链接") : h("span", { className: "skhub-tag skhub-tag-local" }, "本地"),
-                  isLink
-                    ? h("button", { className: "skhub-btn skhub-btn-secondary", disabled: busy, title: "仅删除链接，不影响中心技能库", onClick: function () { action("/uninstall", { platform: p.id, skill: x.name }, "已卸载链接：" + x.name + " ← " + p.name); } }, "卸载")
-                    : h("button", { className: "skhub-btn skhub-btn-danger", disabled: busy, title: "删除该平台下的本地技能数据源", onClick: function () { action("/uninstall", { platform: p.id, skill: x.name }, "已删除本地技能：" + x.name + " ← " + p.name); } }, "删除"));
-                children.push(row);
+                  openBtn,
+                  unBtn));
               });
             }
 

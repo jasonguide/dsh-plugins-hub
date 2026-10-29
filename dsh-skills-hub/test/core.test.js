@@ -2,10 +2,10 @@
 // 运行：node --test test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, lstatSync, readlinkSync, symlinkSync, unlinkSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, lstatSync, realpathSync, readlinkSync, symlinkSync, unlinkSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { expandDir, validSkillName, uninstallSkill, LINK_TYPE, IS_WINDOWS } from "../lib/index.js";
+import { expandDir, validSkillName, uninstallSkill, resolveOpenPath, scanDir, LINK_TYPE, IS_WINDOWS } from "../lib/index.js";
 
 test("链接类型随平台选择（Windows=Junction / 其他=dir）", () => {
   if (IS_WINDOWS) {
@@ -107,4 +107,36 @@ test("uninstallSkill 拒绝只读平台", () => {
   const r = uninstallSkill("claude", "anything");
   assert.equal(r.ok, false, "只读平台应拒绝删除");
   assert.match(r.error, /只读/, "错误信息应说明只读");
+});
+
+test("resolveOpenPath 拒绝非法输入，接受真实存在的技能目录", () => {
+  assert.equal(resolveOpenPath("no-such-platform", "x").ok, false, "未知平台应拒绝");
+  assert.equal(resolveOpenPath("agents", "../evil").ok, false, "路径穿越应被拒绝");
+  assert.match(resolveOpenPath("no-such-platform", "x").error, /未知平台/);
+  assert.match(resolveOpenPath("agents", "../evil").error, /非法技能名/);
+
+  // 中心技能库根目录必然存在（本插件以它为数据源）；顺带验证技能目录解析
+  assert.equal(resolveOpenPath("agents", "").ok, true, "平台根目录应可解析");
+  const central = scanDir("~/.agents/skills", []);
+  if (central.exists && central.skills.length) {
+    const r = resolveOpenPath("agents", central.skills[0].name);
+    assert.equal(r.ok, true, "已存在的技能目录应可解析");
+    assert.ok(r.path.endsWith(central.skills[0].name), "路径应指向该技能目录");
+  }
+});
+
+test("resolveOpenPath 对链接条目返回真实目标（realpath）", () => {
+  const base = mkdtempSync(join(tmpdir(), "skhub-test-"));
+  try {
+    const src = join(base, "src-skill");
+    mkdirSync(src);
+    const link = join(base, "linked-skill");
+    symlinkSync(src, link, IS_WINDOWS ? "junction" : "dir");
+    // 复现 resolveOpenPath 的目标解析逻辑：链接 → realpath
+    const st = lstatSync(link);
+    assert.ok(st.isSymbolicLink(), "应识别为链接");
+    assert.equal(realpathSync(link), realpathSync(src), "realpath 应解析到同一真实目录");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
 });

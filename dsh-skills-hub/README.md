@@ -29,6 +29,7 @@ Zero third-party runtime dependencies (Node.js built-ins only). DSH runs on Wind
   - **Link entry** (pointing at the central library) → remove the link only, keep the data source.
   - **Local skill** (the agent tool's own real directory) → delete that platform's data source.
 - Read-only platforms (e.g. Claude Code) are shown without write actions.
+- Open in file manager: click a skill name in the central library, or the 「打开」 button on any platform row, to reveal that directory in Explorer (Finder / xdg-open on macOS / Linux). Link entries open their real target, so every platform lands on the same data source.
 - Custom platforms: add any local skills directory in Settings, persisted to `~/.skillsmanage/config.json`.
 - Local-first, no database: metadata is scanned live from the filesystem.
 
@@ -133,8 +134,9 @@ pnpm install
 Open DSH **Settings → 技能中心 (Skills Hub)**:
 
 - Platforms are grouped by category (Central / Coding / Lobster / Custom); only platforms actually installed on this machine are shown.
-- The central library card lists all available skills (data source, never deleted).
+- The central library card lists all available skills (data source, never deleted). **Click a skill name** to open that directory in your file manager.
 - Each agent platform card lists its skills (badged "link" vs "local") with an install dropdown:
+  - 「打开」(open) button on every row → open that directory in your file manager (link entries open their real target).
   - Link entry → 「卸载」(uninstall) button (removes the link only).
   - Local entry → 「删除」(delete) button (deletes that platform's data source).
 - Add custom platforms at the bottom (directory path + optional display name).

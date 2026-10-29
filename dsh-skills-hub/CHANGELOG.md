@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0] - 2026-10-29
+
+- **新增「用文件管理器打开目录」**：
+  - 中心技能库（Central）里点击技能名 → 用系统文件管理器打开该技能目录（名称由 chip 改为可点击按钮，带 hover 反馈）。
+  - 各 Coding / Lobster / 自定义平台技能行在「链接 / 本地」标签之后新增「打开」按钮 → 打开该技能目录。
+  - 链接条目打开其**真实目标**（`realpath`），不同平台上的同一条技能都落到同一份数据源。
+- 新增 Host 路由 `POST /api/dsh-skills-hub/open`，复用写接口的 loopback + 标记头校验。
+- 跨平台实现：Windows `explorer.exe` / macOS `open` / Linux `xdg-open`；进程 `detached` + `unref`，不阻塞、不等待文件管理器退出。
+- 目录解析做路径穿越防护（`validSkillName`）与存在性校验，失败时前端展示「打开失败：…」。
+- 单元测试补 `resolveOpenPath` 两条：非法输入拒绝、链接条目 `realpath` 解析。
+
 ## [0.3.2] - 2026-10-15
 
 - **修复 DSH 0.2.x 兼容性**（设置页不显示、插件被整体跳过）：

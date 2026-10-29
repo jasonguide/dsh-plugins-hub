@@ -16,14 +16,16 @@
 //
 // HTTP 路由（loopback-only + 写接口要求自定义标记头，防 DNS rebinding）：
 //   GET  /api/dsh-skills-hub/state        -> { central, platforms }
+//   POST /api/dsh-skills-hub/open         -> { platform, skill? }   // 用系统文件管理器打开目录
 //   POST /api/dsh-skills-hub/install      -> { platform, skill }
 //   POST /api/dsh-skills-hub/uninstall    -> { platform, skill }   // 链接=删链接 / 本地=删数据源
 //   POST /api/dsh-skills-hub/add-dir      -> { dir, name?, readonly? }
 //   POST /api/dsh-skills-hub/remove-dir   -> { id }
 
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, lstatSync, readlinkSync, symlinkSync, unlinkSync, rmSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, lstatSync, realpathSync, readlinkSync, symlinkSync, unlinkSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
+import { spawn } from "node:child_process";
 
 const name = "skills-hub";
 const inject = ["webServer"];
@@ -262,6 +264,75 @@ function uninstallSkill(platformId, skill) {
   return { ok: false, error: "目标既非目录也非链接，拒绝删除: " + target };
 }
 
+// ---- 打开目录（系统文件管理器） -----------------------------
+
+/**
+ * 解析要打开的绝对目录：
+ *   - skill 为空 → 平台技能根目录；
+ *   - skill 有值 → 该技能目录。
+ * 链接条目打开真实目标（realpath），让不同平台上的同一条技能都落到同一份数据源。
+ */
+function resolveOpenPath(platformId, skill) {
+  const p = platformById(platformId);
+  if (!p) return { ok: false, error: "未知平台: " + platformId };
+  const root = expandDir(p.dir);
+  let target = root;
+  if (skill !== undefined && skill !== null && String(skill) !== "") {
+    const s = String(skill);
+    if (!validSkillName(s)) return { ok: false, error: "非法技能名: " + s };
+    target = join(root, s);
+  }
+  if (!existsSync(target)) return { ok: false, error: "目录不存在: " + target };
+  try {
+    if (lstatSync(target).isSymbolicLink()) target = realpathSync(target);
+  } catch {
+    /* 保留原路径，仍可打开 */
+  }
+  return { ok: true, path: target };
+}
+
+/** 用系统文件管理器打开目录：Windows=explorer / macOS=open / Linux=xdg-open。 */
+function openInFileManager(absPath) {
+  let cmd;
+  let args;
+  if (IS_WINDOWS) {
+    cmd = "explorer.exe";
+    args = [absPath];
+  } else if (platform() === "darwin") {
+    cmd = "open";
+    args = [absPath];
+  } else {
+    cmd = "xdg-open";
+    args = [absPath];
+  }
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(cmd, args, { detached: true, stdio: "ignore", windowsHide: true });
+    } catch (e) {
+      resolve({ ok: false, error: "启动文件管理器失败: " + String(e && e.message ? e.message : e) });
+      return;
+    }
+    let settled = false;
+    const done = (r) => {
+      if (settled) return;
+      settled = true;
+      resolve(r);
+    };
+    child.on("error", (e) => done({ ok: false, error: "启动文件管理器失败: " + String(e && e.message ? e.message : e) }));
+    // 不等待进程退出（explorer 会长期存在）；成功 spawn 即认为已打开。
+    child.unref();
+    setTimeout(() => done({ ok: true, path: absPath }), 120);
+  });
+}
+
+/** 打开某平台（或某平台下的某技能）目录。 */
+function openPath(platformId, skill) {
+  const resolved = resolveOpenPath(platformId, skill);
+  if (!resolved.ok) return Promise.resolve(resolved);
+  return openInFileManager(resolved.path);
+}
+
 // ---- 自定义平台 -----------------------------------------------------------------
 
 function addDir(name, dir, readonly) {
@@ -410,6 +481,8 @@ function apply(ctx) {
             return run(res, () => installSkill(String(body.platform || ""), String(body.skill || "")));
           case "/api/dsh-skills-hub/uninstall":
             return run(res, () => uninstallSkill(String(body.platform || ""), String(body.skill || "")));
+          case "/api/dsh-skills-hub/open":
+            return run(res, () => openPath(String(body.platform || ""), body.skill === undefined ? "" : String(body.skill)));
           case "/api/dsh-skills-hub/add-dir":
             return run(res, () => addDir(body.name, body.dir, body.readonly));
           case "/api/dsh-skills-hub/remove-dir":
@@ -444,6 +517,9 @@ export {
   platformById,
   installSkill,
   uninstallSkill,
+  resolveOpenPath,
+  openInFileManager,
+  openPath,
   addDir,
   removeDir,
   readConfig,
