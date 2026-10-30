@@ -1,6 +1,6 @@
 {
   "name": "dsh-skills-hub",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "跨平台 AI Skills 统一管理器：以 ~/.agents/skills 为中心技能库，通过系统符号链接把同一份技能一键安装/卸载到 Claude Code、Cursor、Codex、Gemini CLI、Trae、Windsurf 等多个 Agent 工具，仅展示本机已安装的平台，统一管理本地技能目录与只读平台展示。支持 Windows / macOS / Linux。DeepSeek Harness plugin.",
   "type": "module",
   "main": "lib/index.js",

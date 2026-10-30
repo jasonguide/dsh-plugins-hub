@@ -291,7 +291,13 @@ function resolveOpenPath(platformId, skill) {
   return { ok: true, path: target };
 }
 
-/** 用系统文件管理器打开目录：Windows=explorer / macOS=open / Linux=xdg-open。 */
+/**
+ * 用系统文件管理器打开目录：Windows=explorer / macOS=open / Linux=xdg-open。
+ *
+ * 注意：Windows 上**绝不能**传 windowsHide:true —— 它会把 Explorer 的窗口创建成
+ * 不可见（进程照常起、窗口 IsWindowVisible=False），表现为"点了没反应但多了一堆
+ * explorer.exe 进程"。这里显式传 windowsHide:false。
+ */
 function openInFileManager(absPath) {
   let cmd;
   let args;
@@ -308,7 +314,8 @@ function openInFileManager(absPath) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(cmd, args, { detached: true, stdio: "ignore", windowsHide: true });
+      // windowsHide 必须为 false：true 会让 Explorer 窗口不可见（详见上方注释）。
+      child = spawn(cmd, args, { detached: true, stdio: "ignore", windowsHide: false });
     } catch (e) {
       resolve({ ok: false, error: "启动文件管理器失败: " + String(e && e.message ? e.message : e) });
       return;

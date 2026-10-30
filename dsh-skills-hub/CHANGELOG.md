@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1] - 2026-10-30
+
+- **修复「打开」点击无反应、并堆积大量 Windows 资源管理器进程**：
+  - 根因：`spawn(..., { windowsHide: true })` 会把 Explorer 的窗口创建成**不可见**——进程正常起、`IsWindowVisible` 为 false，用户看不到窗口，但每个不可见窗口都留下一个 `explorer.exe` 常驻进程，反复点击就不断堆积。
+  - 修复：改为 `windowsHide: false`（该参数本意是隐藏控制台窗口，对 GUI 程序的副作用是连主窗口一起隐藏）。
+  - 实测对比：`windowsHide:true` → 新增窗口 `IsWindowVisible=False`；`windowsHide:false` → `True`，正常弹出。
+- 代码注释补充该坑，避免后续再退回去。
+
 ## [0.4.0] - 2026-10-29
 
 - **新增「用文件管理器打开目录」**：
