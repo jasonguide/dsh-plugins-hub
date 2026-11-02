@@ -437,12 +437,37 @@ window.__ModuleLoader__.load({
     var WATCHDOG_MS = 6e4;
     var WATCHDOG_ARM_MS = WATCHDOG_MS + 5e3;
     var RECONNECT_MIN_GAP_MS = 5e3;
+    var SEQ_TTL_MS = 24 * 60 * 60 * 1e3;
     function startNotifySession(ports, onFrame) {
       let source = null;
       let lastActivity = 0;
-      let lastSeq = 0;
+      let lastSeq = restoreSeq();
       let watchdog = null;
       let lastReconnectAt = 0;
+      function restoreSeq() {
+        try {
+          const raw = ports.readSeq?.() ?? null;
+          if (raw === null) return 0;
+          const parsed = Number.parseInt(raw, 10);
+          if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+          const savedAtRaw = ports.readSeqSavedAt?.() ?? null;
+          const savedAt = savedAtRaw === null ? NaN : Number.parseInt(savedAtRaw, 10);
+          if (!Number.isFinite(savedAt) || savedAt <= 0) return 0;
+          if (ports.now() - savedAt > SEQ_TTL_MS) return 0;
+          return parsed;
+        } catch {
+          return 0;
+        }
+      }
+      function advanceSeq(seq) {
+        lastSeq = seq;
+        const at = ports.now();
+        try {
+          ports.writeSeq?.(String(seq));
+          ports.writeSeqSavedAt?.(String(at));
+        } catch {
+        }
+      }
       function armWatchdog() {
         if (watchdog !== null) ports.clearTimer(watchdog);
         watchdog = ports.setTimer(() => {
@@ -481,7 +506,7 @@ window.__ModuleLoader__.load({
               if (data.type === "notify") {
                 if (typeof data.seq === "number") {
                   if (lastSeq > 0 && data.seq <= lastSeq) return;
-                  lastSeq = data.seq;
+                  advanceSeq(data.seq);
                 }
                 onFrame(data);
               }
@@ -532,6 +557,11 @@ window.__ModuleLoader__.load({
         return input.playOnly === true;
       }
       return true;
+    }
+    var STALE_FRAME_MS = 12e4;
+    function isStaleFrame(ts, now) {
+      if (typeof ts !== "number" || !Number.isFinite(ts)) return false;
+      return now - ts > STALE_FRAME_MS;
     }
 
     // src/client/index.tsx
@@ -3244,6 +3274,21 @@ window.__ModuleLoader__.load({
         }
       });
     }
+    var SEQ_KEY = "dsh-notifier:seq";
+    var SEQ_SAVED_AT_KEY = "dsh-notifier:seq-at";
+    function readStoredSeq(key) {
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    }
+    function writeStoredSeq(key, value) {
+      try {
+        localStorage.setItem(key, value);
+      } catch {
+      }
+    }
     function isSecureContext() {
       return window.isSecureContext === true;
     }
@@ -3303,6 +3348,9 @@ window.__ModuleLoader__.load({
       const kind = typeof payload.kind === "string" ? payload.kind : "";
       const title = typeof payload.title === "string" ? payload.title : "";
       const message = typeof payload.message === "string" ? payload.message : "";
+      if (kind !== "test" && isStaleFrame(payload.ts, Date.now())) {
+        return;
+      }
       if (!frameAccepted({
         kind,
         whenVisible: payload.whenVisible,
@@ -4304,6 +4352,14 @@ window.__ModuleLoader__.load({
                 },
                 warn: (message, cause) => {
                   console.warn("[dsh-notifier] " + message + "：", cause);
+                },
+                readSeq: () => readStoredSeq(SEQ_KEY),
+                writeSeq: (value) => {
+                  writeStoredSeq(SEQ_KEY, value);
+                },
+                readSeqSavedAt: () => readStoredSeq(SEQ_SAVED_AT_KEY),
+                writeSeqSavedAt: (value) => {
+                  writeStoredSeq(SEQ_SAVED_AT_KEY, value);
                 }
               },
               function(payload) {

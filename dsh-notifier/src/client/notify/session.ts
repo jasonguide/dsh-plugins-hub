@@ -37,7 +37,29 @@ export interface SessionPorts {
   clearTimer(handle: number): void;
   /** 非致命问题的留痕出口（解析失败、关闭失败、EventSource 不可用）。 */
   warn(message: string, cause: unknown): void;
+  /**
+   * 序号水位的持久化读写（可选）：刷新页面、重新挂载都是新实例，内存里的 lastSeq 会归零。
+   * 归零后首次请求不带 `?since=`，服务端就会把整个补拉缓冲回放一遍——历史通知被当成
+   * 刚发生的又弹一次。持久化后重连能带上正确水位。
+   *
+   * 缺省（未提供）时退回纯内存语义：仍可用，只是每次重挂载都从头回放，由展示层的
+   * 陈旧帧护栏兜底不打扰用户。
+   */
+  readSeq?(): string | null;
+  writeSeq?(value: string): void;
+  /** 水位的保存时刻（毫秒时间戳字符串）；与服务端序号是否「新鲜」配套，见 SEQ_TTL_MS。 */
+  readSeqSavedAt?(): string | null;
+  writeSeqSavedAt?(value: string): void;
 }
+
+/**
+ * 持久化水位的有效期。
+ *
+ * 服务端序号来自 `seq.json`，被清掉后从 1 重新计数；客户端若一直沿用旧的高水位，此后所有
+ * 新通知都会被当成「已见过」静默丢弃。24 小时是个保守折中：正常使用下水位每次推送都会
+ * 刷新（远不会过期），而隔夜后首次打开页面即使服务端重置过也已自然作废。
+ */
+export const SEQ_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface NotifySession {
   close(): void;
@@ -50,10 +72,48 @@ export function startNotifySession(
 ): NotifySession {
   let source: EventSourceLike | null = null;
   let lastActivity = 0;
-  // lastSeq 既是去重水位又是 since 的起点：两者必须同源，否则要么重复提醒、要么漏帧
-  let lastSeq = 0;
+  // lastSeq 既是去重水位又是 since 的起点：两者必须同源，否则要么重复提醒、要么漏帧。
+  // 初值优先取持久化水位：新实例（刷新、重挂载）内存里是空的，不读回来就会以 since=0
+  // 重连、让服务端回放整个缓冲。
+  let lastSeq = restoreSeq();
   let watchdog: number | null = null;
   let lastReconnectAt = 0;
+
+  /**
+   * 读回持久化水位；任何异常（storage 不可用、脏值）都当 0 处理，绝不让它挡住启动。
+   *
+   * 只认「新鲜」的水位：服务端序号来自 `seq.json`，一旦该文件被清掉（重置 DSH_HOME、
+   * 换机器、手工清理），服务端会从 1 重新计数，而客户端手里的高水位会把此后所有新通知
+   * 都判成「已见过」静默丢弃——那比重复弹一次严重得多。故水位带时间戳，超过
+   * `SEQ_TTL_MS` 一律作废、从 0 起算（代价只是多回放一次缓冲，由展示层陈旧帧护栏兜底）。
+   */
+  function restoreSeq(): number {
+    try {
+      const raw = ports.readSeq?.() ?? null;
+      if (raw === null) return 0;
+      const parsed = Number.parseInt(raw, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+      const savedAtRaw = ports.readSeqSavedAt?.() ?? null;
+      const savedAt = savedAtRaw === null ? NaN : Number.parseInt(savedAtRaw, 10);
+      if (!Number.isFinite(savedAt) || savedAt <= 0) return 0;
+      if (ports.now() - savedAt > SEQ_TTL_MS) return 0;
+      return parsed;
+    } catch {
+      return 0;
+    }
+  }
+
+  /** 推进水位并尽力持久化；写失败不影响本次会话（内存水位仍然有效）。 */
+  function advanceSeq(seq: number): void {
+    lastSeq = seq;
+    const at = ports.now();
+    try {
+      ports.writeSeq?.(String(seq));
+      ports.writeSeqSavedAt?.(String(at));
+    } catch {
+      /* 水位写不进去只是下次重连多回放几条，不值得打断通知 */
+    }
+  }
 
   function armWatchdog(): void {
     if (watchdog !== null) ports.clearTimer(watchdog);
@@ -96,7 +156,7 @@ export function startNotifySession(
           if (data.type === "notify") {
             if (typeof data.seq === "number") {
               if (lastSeq > 0 && data.seq <= lastSeq) return;
-              lastSeq = data.seq;
+              advanceSeq(data.seq);
             }
             onFrame(data);
           }

@@ -254,3 +254,111 @@ describe("SSE 会话：重连风暴抑制与关闭", () => {
     expect(sources).toHaveLength(0);
   });
 });
+
+/**
+ * 序号水位的持久化（#延迟回放）。
+ *
+ * 症状：用户 09:56 已处理的提问，浏览器在 11:33 才弹，且多条挤在同一刻。根因是水位只在
+ * 内存里，刷新或重挂载即归零 → 以 since=0 重连 → 服务端回放整个补拉缓冲。
+ */
+describe("SSE 会话：序号水位的持久化", () => {
+  /** 复用 harness 的端口形状，外加可控的 storage 桩。 */
+  function persistedHarness(initial: {
+    seq?: string | null;
+    savedAt?: string | null;
+    storeThrows?: boolean;
+  }) {
+    const sources: FakeSource[] = [];
+    const frames: Array<Record<string, unknown>> = [];
+    const store = new Map<string, string>();
+    if (initial.seq !== undefined && initial.seq !== null) store.set("seq", initial.seq);
+    if (initial.savedAt !== undefined && initial.savedAt !== null) store.set("at", initial.savedAt);
+    let clock = 1_000_000;
+
+    const session = startNotifySession(
+      {
+        url: "/api/dsh-notifier/events",
+        createSource: (url: string): EventSourceLike => {
+          const source: FakeSource = {
+            url,
+            closed: 0,
+            onmessage: null,
+            onerror: null,
+            close(): void {
+              this.closed += 1;
+            },
+          };
+          sources.push(source);
+          return source;
+        },
+        now: () => clock,
+        setTimer: () => 1,
+        clearTimer: () => undefined,
+        warn: () => undefined,
+        readSeq: () => {
+          if (initial.storeThrows) throw new Error("storage blocked");
+          return store.get("seq") ?? null;
+        },
+        writeSeq: (value) => {
+          if (initial.storeThrows) throw new Error("storage blocked");
+          store.set("seq", value);
+        },
+        readSeqSavedAt: () => {
+          if (initial.storeThrows) throw new Error("storage blocked");
+          return store.get("at") ?? null;
+        },
+        writeSeqSavedAt: (value) => {
+          if (initial.storeThrows) throw new Error("storage blocked");
+          store.set("at", value);
+        },
+      },
+      (frame) => frames.push(frame),
+    );
+
+    return {
+      session,
+      sources,
+      frames,
+      store,
+      current: () => sources[sources.length - 1]!,
+      emit: (payload: unknown) => {
+        sources[sources.length - 1]!.onmessage?.({ data: JSON.stringify(payload) });
+      },
+      advance: (ms: number) => {
+        clock += ms;
+      },
+      clock: () => clock,
+    };
+  }
+
+  it("新实例读回持久化水位，重连带 since 而不是回放整个缓冲", () => {
+    const h = persistedHarness({ seq: "42", savedAt: "1000000" });
+    // 构造期就该带着 42 去连，而不是先不带 since 再等重连
+    expect(h.current().url).toBe("/api/dsh-notifier/events?since=42");
+  });
+
+  it("水位超过 TTL 一律作废（服务端 seq.json 被清后会从 1 重数，旧高水位会吞掉新通知）", () => {
+    const h = persistedHarness({ seq: "42", savedAt: "1000000" });
+    // 默认时钟 1_000_000 与 savedAt 相同 => 新鲜，先确认基线
+    expect(h.current().url).toContain("since=42");
+    h.session.close();
+
+    // 把 savedAt 挪到 TTL 之外
+    const stale = persistedHarness({ seq: "42", savedAt: String(1_000_000 - 24 * 60 * 60 * 1000 - 1) });
+    expect(stale.current().url).toBe("/api/dsh-notifier/events");
+  });
+
+  it("收到新帧即回写水位与时刻（下次重挂载才能接上）", () => {
+    const h = persistedHarness({});
+    h.emit({ type: "notify", seq: 7, kind: "done" });
+    expect(h.store.get("seq")).toBe("7");
+    expect(h.store.get("at")).toBe(String(h.clock()));
+  });
+
+  it("storage 抛错不炸挂载，退回内存语义并照常收帧", () => {
+    const h = persistedHarness({ storeThrows: true });
+    expect(h.current().url).toBe("/api/dsh-notifier/events");
+    expect(() => h.emit({ type: "notify", seq: 1, kind: "done" })).not.toThrow();
+    expect(h.frames).toHaveLength(1);
+  });
+});

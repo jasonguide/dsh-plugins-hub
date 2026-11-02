@@ -50,3 +50,25 @@ export declare function frameAccepted(input: {
     playOnly: unknown;
     visibility: string;
 }): boolean;
+/**
+ * 陈旧帧的判定阈值：超过这个岁数的帧只推进水位、不弹提醒。
+ *
+ * 为什么需要它：服务端 `sinceOf()` 在没有 `?since=` 时返回 0，语义是「回放整个补拉缓冲」，
+ * 而不是「不回放」。客户端 `lastSeq` 是内存变量（刷新、重新挂载即归零），一旦以 0 重连，
+ * 整个 200 条历史就会被当成刚到的新通知逐条弹出来——用户看到的是「几小时前的提问到现在才响」，
+ * 且多条挤在同一刻。
+ *
+ * 2 分钟的取值：足以容纳网络抖动、短时休眠唤醒后的正常回放（这几秒到几十秒内的帧仍该提醒），
+ * 又能拦住分钟级以上、明显属于历史重放的帧。
+ */
+export declare const STALE_FRAME_MS = 120000;
+/**
+ * 这一帧是不是「陈旧的历史回放」。
+ *
+ * 判据只在帧自带 `ts` 时成立：缺失 `ts` 的旧版服务端帧无从判断岁数，一律按「不陈旧」放行
+ * （宁可多弹一次，不要因为字段缺失而静默吞掉真实提醒）。时钟回拨（`age < 0`）同样放行。
+ *
+ * @param ts 帧的发生时刻（服务端 `Date.now()` 毫秒）；非有限数字视为缺失。
+ * @param now 当前客户端时刻。
+ */
+export declare function isStaleFrame(ts: unknown, now: number): boolean;

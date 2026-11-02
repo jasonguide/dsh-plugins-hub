@@ -33,6 +33,7 @@ import {
   displayChannelOf,
   fallbackChannelOf,
   frameAccepted,
+  isStaleFrame,
   soundPolicyOf,
 } from "./notify/policy.ts";
 import * as React from "react";
@@ -194,6 +195,31 @@ function claimMaster(): boolean {
   });
 }
 
+/**
+ * SSE 序号水位的持久化读写。
+ *
+ * 不持久化的话，刷新页面或重新挂载后 lastSeq 归零，客户端以 `since=0` 重连，服务端就把整个
+ * 补拉缓冲回放一遍——历史通知被当成刚发生的又弹一次。
+ */
+const SEQ_KEY = "dsh-notifier:seq";
+const SEQ_SAVED_AT_KEY = "dsh-notifier:seq-at";
+
+function readStoredSeq(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSeq(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* 隐私模式等场景写不进去：退回内存语义，交给展示层陈旧帧护栏兜底 */
+  }
+}
+
 /** 页面是否处于安全上下文（HTTPS 或 localhost）——系统级 Notification 的前提。 */
 function isSecureContext() {
   return window.isSecureContext === true;
@@ -297,6 +323,13 @@ function handleNotifyFrame(payload: Record<string, unknown>, owner: object) {
   const kind = typeof payload.kind === "string" ? payload.kind : "";
   const title = typeof payload.title === "string" ? payload.title : "";
   const message = typeof payload.message === "string" ? payload.message : "";
+  // 陈旧帧护栏：重连时若 lastSeq 归零，服务端会把整个补拉缓冲（最多 200 条）原样推一遍，
+  // 历史通知会被当成刚发生的又弹一次（用户看到「几小时前的提问现在才响」）。水位已在
+  // session 层推进，这里只负责不打扰——判定见 notify/policy.ts 的 isStaleFrame。
+  // 测试通知不受此限：它的目的就是验证链路，且用户刚点的按钮。
+  if (kind !== "test" && isStaleFrame(payload.ts, Date.now())) {
+    return;
+  }
   // 测试通知无条件提醒；其余帧在页面可见时不打扰，除非帧自带 whenVisible——判定见 notify/policy.ts
   if (
     !frameAccepted({
@@ -1912,6 +1945,14 @@ export function apply(ctx: ClientContext): void {
             },
             warn: (message, cause) => {
               console.warn("[dsh-notifier] " + message + "：", cause);
+            },
+            readSeq: () => readStoredSeq(SEQ_KEY),
+            writeSeq: (value) => {
+              writeStoredSeq(SEQ_KEY, value);
+            },
+            readSeqSavedAt: () => readStoredSeq(SEQ_SAVED_AT_KEY),
+            writeSeqSavedAt: (value) => {
+              writeStoredSeq(SEQ_SAVED_AT_KEY, value);
             },
           },
           function (payload) {

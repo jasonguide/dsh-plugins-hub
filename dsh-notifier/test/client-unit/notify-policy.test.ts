@@ -11,7 +11,9 @@ import {
   displayChannelOf,
   fallbackChannelOf,
   frameAccepted,
+  isStaleFrame,
   soundPolicyOf,
+  STALE_FRAME_MS,
 } from "../../src/client/notify/policy.ts";
 
 describe("soundPolicyOf：帧级声音策略", () => {
@@ -123,5 +125,37 @@ describe("frameAccepted：可见性门", () => {
         visibility: "hidden",
       }),
     ).toBe(true);
+  });
+});
+
+/**
+ * 陈旧帧判定 —— 重连回放的历史通知不该被当成刚发生的再弹一次。
+ *
+ * 症状：09:56 已处理的提问，浏览器 11:33 才弹。根因是水位归零后以 since=0 重连，服务端
+ * 回放整个补拉缓冲，而展示层从不看帧的 ts。
+ */
+describe("isStaleFrame：陈旧帧判定", () => {
+  const NOW = 1_700_000_000_000;
+
+  it("阈值内正常提醒", () => {
+    expect(isStaleFrame(NOW - 1000, NOW)).toBe(false);
+    expect(isStaleFrame(NOW - STALE_FRAME_MS + 1, NOW)).toBe(false);
+  });
+
+  it("超过阈值判为陈旧（图上那种几小时前的回放必被拦）", () => {
+    expect(isStaleFrame(NOW - STALE_FRAME_MS - 1, NOW)).toBe(true);
+    expect(isStaleFrame(NOW - 97 * 60 * 1000, NOW)).toBe(true);
+  });
+
+  it("缺 ts / 非有限数一律放行（缺字段宁可多弹一次，不要静默吞掉真实提醒）", () => {
+    expect(isStaleFrame(undefined, NOW)).toBe(false);
+    expect(isStaleFrame(null, NOW)).toBe(false);
+    expect(isStaleFrame("123", NOW)).toBe(false);
+    expect(isStaleFrame(Number.NaN, NOW)).toBe(false);
+    expect(isStaleFrame(Number.POSITIVE_INFINITY, NOW)).toBe(false);
+  });
+
+  it("时钟回拨（ts 在未来）不判陈旧", () => {
+    expect(isStaleFrame(NOW + 60_000, NOW)).toBe(false);
   });
 });
